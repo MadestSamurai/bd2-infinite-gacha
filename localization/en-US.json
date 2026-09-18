@@ -162,5 +162,11 @@
   "B 组服装列表": "B target list",
   "B 组至少命中数量": "Minimum B hits",
   "BD2 无限抽抽乐助手": "BD2 Infinite Gacha",
-  "Language / 语言": "Language / 语言"
+  "Language / 语言": "Language / 语言",
+  "截止 ": "Ends ",
+  "截止时间未提供": "End date unavailable",
+  "当前结果": "Current result",
+  "本机时间": "Local time",
+  "游戏未提供该卡池的截止时间": "The game did not provide an end date for this pool.",
+  "截止时间按本机时区显示，由新到旧排列": "End dates use your local time zone, newest first."
 }

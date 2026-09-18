@@ -9,7 +9,7 @@ namespace BD2InfiniteGacha
 {
     public static class Identity
     {
-        public const string Version="0.2.1",Runtime="BD2InfiniteGacha.Runtime4";
+        public const string Version="0.2.2",Runtime="BD2InfiniteGacha.Runtime5";
         public static string Root {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"BD2InfiniteGacha");}}
         public static string Hash(string value){using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value))).Replace("-","").ToLowerInvariant();}
     }
@@ -23,6 +23,7 @@ namespace BD2InfiniteGacha
     [DataContract] public class Pool
     {
         [DataMember] public int Id,DrawId,Size;
+        [DataMember] public long EndTimeUnixMilliseconds;
         [DataMember] public string Name {get;set;} = "";
         [DataMember] public string Key="";
         [DataMember] public Costume[] Costumes=new Costume[0];

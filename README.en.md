@@ -27,6 +27,8 @@ Download an EXE and run it. ZIPs also contain both READMEs and licenses. Verify 
 
 Use the top-right language selector at any time. Switching languages does not restart rerolling or change your targets. Costume, character and pool names follow the **game's language**.
 
+The pool selector identifies events by **end date**, newest first. Dates use your computer’s local time zone; hover to see the time zone and the in-game event name. **Current result** marks the pool shown in the game. Pool IDs distinguish matching dates, and pools without a supplied end date stay at the bottom. Reordering preserves your targets and stop rules.
+
 ## Stop rules
 
 A contains priority targets; B contains secondary targets. A costume belongs to at most one group. Set an unconditional A threshold from 1 to 10. Lower tiers appear automatically and can each be enabled separately.
@@ -74,7 +76,7 @@ Requires Windows x64 and the .NET 8 SDK. Normal builds and regression tests **do
 .\package.ps1 -Locked
 ```
 
-Assets are written to `dist/v0.2.1/`. See [development and compatibility](docs/DEVELOPMENT.md), [translation maintenance](docs/LOCALIZATION.md), and [release notes](docs/RELEASE_NOTES.md).
+Assets are written to `dist/v0.2.2/`. See [development and compatibility](docs/DEVELOPMENT.md), [translation maintenance](docs/LOCALIZATION.md), and [release notes](docs/RELEASE_NOTES.md).
 
 Client interfaces are resolved locally when connecting. No game assemblies, game data tables, captured accounts or replays are distributed. Interface changes that cannot be matched reliably produce a compatibility error.
 

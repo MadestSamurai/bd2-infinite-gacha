@@ -34,13 +34,14 @@ public static class HookCompiler
         Method("SetResult","GachaResultUI","SetResult",3);
         Method("Preview","ὬὬὯὠὫὡὪὮὢὦὤ","ὮὬὨὤὪὤὫὫὭὭὠ",6);
         Method("Response","ὬὬὯὠὫὡὪὮὢὦὤ","ὦὥὣὢὬὩὧὠὦὤὢ",3);
+        Method("Schedule","ὬὬὯὠὫὡὪὮὢὦὤ","ὢὯὡὧὣὪὥὠὧὧὯ",1);
         Method("SavedPreview","ὬὬὯὠὫὡὪὮὢὦὤ","ὮὧὤὮὣὫὨὣὢὨὬ",0);
         Method("Product","ὡὭὣὡὨὪὨὢὦὧὡ","ὯὪὣὧὥὯὬὫὣὡὣ",0);
         Method("Frame","GameCameraManager","LateUpdate",0);
         var types=roles.GroupBy(r=>r.member.DeclaringType).Select(g=>new TypeContract(g.Key.FullName,index.Shape(g.Key),g.Key.Methods.Where(m=>m.HasBody&&m.Body.Instructions.Count>=10).OrderByDescending(m=>m.Body.Instructions.Count).Take(8).Select(index.Body).ToArray(),g.Select(r=>r.member).Distinct().Select(m=>new MemberContract(m.Name,MetadataIndex.Signature(m),index.MemberBody(m),index.Uses(m))).ToArray())).ToArray();
         return new(1,types,roles.Select(r=>new ApiContract(r.role,r.member.DeclaringType.FullName,r.member.Name,r.member is MethodDefinition m?m.Parameters.Count:-1,MetadataIndex.Signature(r.member))).ToArray(),new());
     }
-    public static PreparedHook Prepare(string managed, string assemblyName="BD2InfiniteGacha.Runtime4")
+    public static PreparedHook Prepare(string managed, string assemblyName="BD2InfiniteGacha.Runtime5")
     {
         using var index=new MetadataIndex(Path.Combine(managed,"Assembly-CSharp.dll"));
         var contract=JsonSerializer.Deserialize<BindingContract>(Resource("BD2InfiniteGacha.Contract.json"))!;

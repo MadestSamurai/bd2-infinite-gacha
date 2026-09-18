@@ -28,7 +28,7 @@ foreach($flavor in @('Portable','Lite')){
     $identityPath=Join-Path $check 'identity.json'
     RunCheck @('--identity',('"'+$identityPath+'"'))
     $identity=Get-Content $identityPath -Raw | ConvertFrom-Json
-    if($identity.runtime -ne 'BD2InfiniteGacha.Runtime4' -or $identity.version -ne $Version){throw 'Embedded identity differs from release'}
+    if($identity.runtime -ne 'BD2InfiniteGacha.Runtime5' -or $identity.version -ne $Version){throw 'Embedded identity differs from release'}
     RunCheck @('--smoke',('"'+$check+'"'))
     $ui=Get-Content (Join-Path $check 'smoke.json') -Raw | ConvertFrom-Json
     if($ui.status -ne 'passed'){throw 'Packaged UI regression failed'}

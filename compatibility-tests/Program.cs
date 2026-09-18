@@ -53,7 +53,7 @@ foreach(var scenario in new[]{("broken",true,false),("ambiguous",false,true)})
 }
 Check(!typeof(HookCompiler).Assembly.GetReferencedAssemblies().Any(a=>a.Name=="Assembly-CSharp" || (a.Name??"").StartsWith("UnityEngine")),"public executable has no linked game libraries");
 var embedded=JsonSerializer.Deserialize<BindingContract>(HookCompiler.Resource("BD2InfiniteGacha.Contract.json"))!;
-Check(new[]{"Preview","Response","SetResult","SkipButton","AnimationStage","Inventory","Text"}.All(role=>embedded.Apis.Any(a=>a.Role==role)),"public package embeds complete preview, skip and inventory contract");
+Check(new[]{"Preview","Response","SetResult","SkipButton","AnimationStage","Inventory","Text","Schedule"}.All(role=>embedded.Apis.Any(a=>a.Role==role)),"public package embeds complete preview, skip and inventory contract");
 Check(!embedded.Apis.Any(a=>a.Role.Contains("Purchase")||a.Role.Contains("Accept")),"contract has no purchase or accept operation");
 Check(HookCompiler.Resource("Hook.RuntimeEngine.cs").Length>1000,"public package embeds owned runtime source");
 Console.WriteLine(JsonSerializer.Serialize(new{status="pass",assertions=checks,gameRequired=false,injection=false}));

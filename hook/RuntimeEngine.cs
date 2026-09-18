@@ -79,7 +79,8 @@ namespace BD2InfiniteGacha.Runtime
                     var have=owned==null?null:owned.Where(o=>o!=null&&o.Id==id).OrderByDescending(o=>o.Level).FirstOrDefault();
                     costumes.Add(new Costume{Id=id,Character=character==null?"":Text(character.CharNameTextId),Name=Text(c.CostumeNameTextId),Level=!inventoryReady?-2:have==null?-1:have.Level,MaxLevel=c.MaxLevel});
                 }
-                if(costumes.Count>0)next.Add(new Pool{Id=g.Id,DrawId=draw.Id,Size=draw.GachaCount,Name=Text(g.GachaNameTextId),Key=Identity.Hash(g.Id+"|"+draw.Id+"|"+string.Join(",",costumes.Select(c=>c.Id.ToString()).ToArray())),Costumes=costumes.ToArray()});
+                var schedule=(GachaScheduleDBInfo)Call("Schedule",g.Id);
+                if(costumes.Count>0)next.Add(new Pool{EndTimeUnixMilliseconds=schedule==null?0:schedule.EndTime,Id=g.Id,DrawId=draw.Id,Size=draw.GachaCount,Name=Text(g.GachaNameTextId),Key=Identity.Hash(g.Id+"|"+draw.Id+"|"+string.Join(",",costumes.Select(c=>c.Id.ToString()).ToArray())),Costumes=costumes.ToArray()});
             }
             pools=next.ToArray();account=identity;
         }

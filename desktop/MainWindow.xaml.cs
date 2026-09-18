@@ -31,7 +31,7 @@ public partial class MainWindow:Window
     {
         if(language==null||controller==null)return;
         string selected=LanguageChoice.SelectedIndex==0?"zh-CN":"en-US";
-        try{LanguagePreference.Save(root,selected);language.Select(selected);RebuildCostumes();updating=true;foreach(var rule in conditions)rule.Refresh();updating=false;ShowResult();Validate();}
+        try{LanguagePreference.Save(root,selected);language.Select(selected);if(snapshot!=null)RefreshPoolList(snapshot);RebuildCostumes();updating=true;foreach(var rule in conditions)rule.Refresh();updating=false;ShowResult();Validate();}
         catch(Exception ex){Error(ex);}
     }
     private bool Matches(object item)
@@ -60,9 +60,8 @@ public partial class MainWindow:Window
             if(next.Account.Length==64)
             {
                 if(account!=next.Account){if(controller.Running)controller.Stop();account=next.Account;poolListKey="";catalogKey="";pool=null;lastActivePool=0;}
-                string key=string.Join("|",next.Pools.Select(p=>p.Id+":"+p.Key+":"+p.Name));
-                if(key!=poolListKey){updating=true;var old=pool?.Id??next.PoolId;Pools.ItemsSource=next.Pools;Pools.SelectedItem=next.Pools.FirstOrDefault(p=>p.Id==old)??next.Pools.FirstOrDefault();updating=false;poolListKey=key;LoadPool();}
-                if(next.PoolId>0&&next.PoolId!=lastActivePool&&!controller.Running){var active=next.Pools.FirstOrDefault(p=>p.Id==next.PoolId);if(active!=null){lastActivePool=next.PoolId;Pools.SelectedItem=((IEnumerable<Pool>)Pools.ItemsSource).FirstOrDefault(p=>p.Id==active.Id);}}
+                RefreshPoolList(next);
+                if(next.PoolId>0&&next.PoolId!=lastActivePool&&!controller.Running){var active=next.Pools.FirstOrDefault(p=>p.Id==next.PoolId);if(active!=null){lastActivePool=next.PoolId;Pools.SelectedItem=((IEnumerable<PoolChoice>)Pools.ItemsSource).FirstOrDefault(p=>p.Pool.Id==active.Id);}}
                 if(pool!=null)
                 {
                     var updated=next.Pools.FirstOrDefault(p=>p.Id==pool.Id);if(updated!=null){pool=updated;string inventory=pool.Key+"|"+string.Join(",",pool.Costumes.Select(c=>c.Id+":"+c.Level+":"+c.Character+":"+c.Name));if(catalogKey!=inventory){catalogKey=inventory;RebuildCostumes();ShowResult();}}
@@ -74,10 +73,20 @@ public partial class MainWindow:Window
             SetEnabled();
         }catch(Exception e){Error(e);try{controller.Stop();}catch{}SetEnabled();}
     }
+    private void RefreshPoolList(Snapshot next)
+    {
+        var choices=PoolChoice.Create(next.Pools,next.PoolId,Ui.Catalog,TimeZoneInfo.Local);
+        string key=string.Join("|",choices.Select(p=>p.Pool.Id+":"+p.Pool.Key+":"+p.Title+":"+p.Subtitle+":"+p.Detail));
+        if(key==poolListKey)return;
+        int old=pool?.Id??next.PoolId;
+        var selected=choices.FirstOrDefault(p=>p.Pool.Id==old)??choices.FirstOrDefault();
+        updating=true;Pools.ItemsSource=choices;Pools.SelectedItem=selected;updating=false;poolListKey=key;
+        if(selected!=null&&pool?.Id==selected.Pool.Id)pool=selected.Pool;else LoadPool();
+    }
     private void LoadPool()
     {
-        if(updating||Pools.SelectedItem is not Pool selected||account.Length!=64)return;
-        pool=selected;draft=preferences.Load(account,pool.Id);updating=true;
+        if(updating||Pools.SelectedItem is not PoolChoice choice||account.Length!=64)return;
+        pool=choice.Pool;draft=preferences.Load(account,pool.Id);updating=true;
         Threshold.Text=draft.Threshold;CountCopies.IsChecked=draft.CountCopies;ExcludeOverflow.IsChecked=draft.ExcludeOverflow;Interval.Text=draft.Interval;shownTop=0;conditions.Clear();
         updating=false;CountingVisibility();catalogKey="";RebuildCostumes();RenderConditions();Validate();ShowResult();
     }
@@ -170,6 +179,8 @@ public partial class MainWindow:Window
             LanguageChoice.SelectedIndex=0;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
             Check(costumes.Count==10&&conditions.Count==0,"initial pool and progressive conditions");
             Check(BList.Items.Count==0&&AList.Items.Count==0,"two empty target lists");
+            Check(Pools.Items.Cast<PoolChoice>().Select(p=>p.Pool.Id).SequenceEqual(new[]{66,55,44,77})&&pool!.Id==55,"latest date first while retaining native current pool");
+            Pools.IsDropDownOpen=true;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("pool-dropdown",(FrameworkElement)((System.Windows.Controls.Primitives.Popup)Pools.Template.FindName("PART_Popup",Pools)).Child);Pools.IsDropDownOpen=false;
             Threshold.Text="3";Check(conditions.Select(r=>r.Row.A).SequenceEqual(new[]{2,1,0}),"descending A rows");
             Unfilled_Click(this,new());Check(BList.Items.Count==9&&AList.Items.Count==0&&!draft.B.Contains(1),"unfilled goes to B list");
             BList.SelectedItems.Add(costumes[1]);BList.SelectedItems.Add(costumes[2]);ToA_Click(this,new());Check(AList.Items.Count==2&&BList.Items.Count==7&&!draft.B.Intersect(draft.A).Any(),"multi-select B to A transfer");
@@ -191,14 +202,20 @@ public partial class MainWindow:Window
             Check(draft.ExcludeOverflow&&ExcludeOverflow.IsChecked==true,"copy mode defaults to excluding overflow");
             ExcludeOverflow.IsChecked=false;Overflow_Changed(this,new());Check(!draft.ExcludeOverflow,"overflow can be unchecked");ExcludeOverflow.IsChecked=true;Overflow_Changed(this,new());
             conditions.Last().Enabled=false;Check(!draft.Rows.Single(r=>r.A==0).Enabled,"A zero disabled");
-            Check(Pools.Text==pool!.Name&&Pools.Text.Length>0,"pool name binding");
+            Check(Pools.SelectedItem is PoolChoice shown&&shown.Pool.Id==pool!.Id&&shown.Title.StartsWith("截止 ")&&shown.Subtitle.Contains("当前结果"),"pool expiry and current result binding");
             ResultExpander.IsExpanded=false;Capture("normal");ResultExpander.IsExpanded=true;Capture("results");ResultExpander.IsExpanded=false;Width=1060;Height=760;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("compact");
             Threshold.Text="1";Start_Click(this,new());Check(controller.Running&&!GroupsPanel.IsEnabled,"start freezes config");Stop_Click(this,new());Check(!controller.Running,"stop releases control");
             Check(preferences.Load(account,pool!.Id).Threshold=="1","account scoped settings saved");
+            var savedTargets=draft.A.ToArray();Pools.SelectedItem=Pools.Items.Cast<PoolChoice>().Single(p=>p.Pool.Id==44);Check(pool!.Id==44,"manual pool selection by identity");
+            Poll();Check(pool!.Id==44,"catalog refresh respects manual selection");
+            Pools.SelectedItem=Pools.Items.Cast<PoolChoice>().Single(p=>p.Pool.Id==55);Check(draft.A.SequenceEqual(savedTargets)&&Threshold.Text=="1","switching back restores pool rules");
             Start_Click(this,new());string owner=((DemoPort)port).Last.Owner;int writes=((DemoPort)port).Commands;
+            ((DemoPort)port).Snapshot.Pools.Single(p=>p.Id==55).EndTimeUnixMilliseconds+=TimeSpan.FromDays(40).Ticks/TimeSpan.TicksPerMillisecond;Poll();
+            Check(pool!.Id==55&&Pools.Items.Cast<PoolChoice>().First().Pool.Id==55&&draft.A.SequenceEqual(savedTargets)&&controller.Running&&((DemoPort)port).Last.Owner==owner,"updated end date reorders without changing rules or active owner");
             LanguageChoice.SelectedIndex=1;Check(controller.Running&&((DemoPort)port).Last.Owner==owner&&((DemoPort)port).Commands==writes,"language switch preserves active command");
             Check(Title=="BD2 Infinite Gacha"&&StartButton.Content.ToString()=="Start rerolling"&&BHeading.Text=="B · Secondary targets","English static UI");
             Check(costumes[0].LevelLabel=="+5"&&costumes[5].LevelLabel=="Not owned"&&conditions[0].Label.Contains("at least"),"English bound model labels");
+            Check(((PoolChoice)Pools.SelectedItem).Title.StartsWith("Ends ")&&((PoolChoice)Pools.SelectedItem).Subtitle.Contains("Current result"),"English date labels update during active run");
             Check(LanguagePreference.Read(root)=="en-US","language persisted separately");Stop_Click(this,new());Width=1260;Height=900;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("english");
             var englishPicker=new AddCostumesWindow(costumes.Where(c=>c.Available&&c.Group==0),Resources){Owner=this};
             englishPicker.Loaded+=(_,_)=>englishPicker.Dispatcher.BeginInvoke(()=>{Check(englishPicker.Title=="Add costumes","English picker title");englishPicker.Close();});englishPicker.ShowDialog();
@@ -220,6 +237,6 @@ public partial class MainWindow:Window
             JsonFiles.Write(Path.Combine(root,"snapshot-smoke.json"),new{status="passed",pool=pool.Id,costumes=costumes.Count,unfilled,resultCards=cards.Length,overflow=Rules.Count(draft,snapshot.Result,pool.Costumes).Overflow,realGameTouched=false});Application.Current.Shutdown();
         }catch(Exception ex){JsonFiles.Write(Path.Combine(root,"snapshot-smoke.json"),new{status="failed",error=ex.ToString()});Application.Current.Shutdown(1);}
     }
-    private void Capture(string name)
-    {UpdateLayout();var content=(FrameworkElement)Content;var target=new RenderTargetBitmap((int)content.ActualWidth,(int)content.ActualHeight,96,96,PixelFormats.Pbgra32);var visual=new DrawingVisual();using(var dc=visual.RenderOpen()){dc.DrawRectangle(Background,null,new Rect(0,0,content.ActualWidth,content.ActualHeight));dc.DrawRectangle(new VisualBrush(content),null,new Rect(0,0,content.ActualWidth,content.ActualHeight));}target.Render(visual);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(target));Directory.CreateDirectory(root);using var f=File.Create(Path.Combine(root,name+".png"));png.Save(f);}
+    private void Capture(string name,FrameworkElement? element=null)
+    {UpdateLayout();var content=element??(FrameworkElement)Content;var target=new RenderTargetBitmap((int)content.ActualWidth,(int)content.ActualHeight,96,96,PixelFormats.Pbgra32);var visual=new DrawingVisual();using(var dc=visual.RenderOpen()){dc.DrawRectangle(Background,null,new Rect(0,0,content.ActualWidth,content.ActualHeight));dc.DrawRectangle(new VisualBrush(content),null,new Rect(0,0,content.ActualWidth,content.ActualHeight));}target.Render(visual);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(target));Directory.CreateDirectory(root);using var f=File.Create(Path.Combine(root,name+".png"));png.Save(f);}
 }

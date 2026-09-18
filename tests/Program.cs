@@ -14,6 +14,23 @@ RuleDraft Draft()=>new(){ExcludeOverflow=false,Threshold="3",A=[1],B=[2],Interva
 Pool Pool()=>new(){Id=10,DrawId=11,Size=10,Key="pool-v1",Name="test",Costumes=Enumerable.Range(1,60).Select(id=>new Costume{Id=id}).ToArray()};
 Snapshot Snap(long? now=null)=>new(){Account=new string('a',64),ProcessId=17,ProcessStart=123,PoolId=10,Pools=[Pool()],Result=Cards(0,0),ResultReady=true,At=now??DateTime.UtcNow.Ticks};
 Control Command(long now)=>new(){Enabled=true,Owner="run1",Account=new string('a',64),ProcessId=17,ProcessStart=123,PoolId=10,PoolKey="pool-v1",Rules=Draft(),Expires=now+TimeSpan.FromSeconds(10).Ticks};
+Test("pool end dates sort newest first with stable fallbacks and explicit timezone",()=>{
+ var zone=TimeZoneInfo.CreateCustomTimeZone("fixture",TimeSpan.FromHours(8),"fixture","fixture");
+ long end=DateTimeOffset.Parse("2026-09-30T23:59:00Z").ToUnixTimeMilliseconds();
+ var pools=new[]{new Pool{Id=1,Name="same",EndTimeUnixMilliseconds=end},new Pool{Id=2,Name="same",EndTimeUnixMilliseconds=end+86400000},new Pool{Id=3,Name="same"},new Pool{Id=4,Name="same",EndTimeUnixMilliseconds=long.MaxValue},new Pool{Id=5,Name="same",EndTimeUnixMilliseconds=end}};
+ var choices=PoolChoice.Create(pools,1,new("en-US"),zone);
+ Check(choices.Select(p=>p.Pool.Id).SequenceEqual(new[]{2,5,1,4,3}),"dates descend, ties use ID, missing/invalid last");
+ Check(choices[2].Title=="Ends 2026-10-01 07:59"&&choices[2].Detail.Contains("UTC+08:00"),"milliseconds, date rollover and explicit local timezone");
+ Check(choices[2].Subtitle=="#1 · Current result"&&!choices[0].Subtitle.Contains("Current"),"current result marker does not change date order");
+ Check(choices[3].Title=="End date unavailable"&&choices[4].EndTime==null,"invalid and zero not epoch dates");
+ var cn=PoolChoice.Create(pools,2,new("zh-CN"),TimeZoneInfo.Utc);
+ Check(cn[0].Title=="截止 2026-10-01 23:59"&&cn[0].Subtitle=="#2 · 当前结果","Chinese labels and timezone conversion");
+ var original=Pool();original.EndTimeUnixMilliseconds=end;var copy=JsonFiles.Clone(original);
+ Check(copy.EndTimeUnixMilliseconds==end&&copy.Key==original.Key,"JSON preserves date without changing pool identity");
+ using var stream=new MemoryStream();var serializer=new DataContractJsonSerializer(typeof(Pool));serializer.WriteObject(stream,original);stream.Position=0;copy=(Pool)serializer.ReadObject(stream)!;
+ Check(copy.EndTimeUnixMilliseconds==end,"runtime serializer preserves milliseconds");
+ Check(PoolChoice.Create([],0,new("en-US"),zone).Length==0,"empty catalog");
+});
 Test("default requires explicit threshold",()=>{var d=new RuleDraft();Check(Rules.Validate(d,Stock(1,2))!="","blank must block");Check(d.CountCopies&&d.Rows.All(r=>!r.Enabled)&&d.Interval=="1000","defaults");});
 Test("copy and distinct semantics",()=>{var d=Draft();Check(Rules.Evaluate(d,Cards(3,2),Pool().Costumes).Matched,"copies");d.CountCopies=false;var result=Rules.Evaluate(d,Cards(3,2),Pool().Costumes);Check(!result.Matched&&result.A==1&&result.B==1,"distinct");d.Rows[1].Enabled=true;d.Rows[1].B="1";Check(Rules.Evaluate(d,Cards(3,2),Pool().Costumes).Matched,"distinct secondary");});
 Test("A priority uses inclusive top and exact lower rows",()=>{var d=Draft();d.Rows[1].Enabled=true;d.Rows[1].B="1";Check(Rules.Evaluate(d,Cards(3,0),Pool().Costumes).Matched,"inclusive");Check(Rules.Evaluate(d,Cards(4,0),Pool().Costumes).Matched,"above");Check(!Rules.Evaluate(d,Cards(2,8),Pool().Costumes).Matched,"not lower threshold");Check(Rules.Evaluate(d,Cards(1,1),Pool().Costumes).Matched,"exact");Check(!Rules.Evaluate(d,Cards(0,10),Pool().Costumes).Matched,"disabled zero");});

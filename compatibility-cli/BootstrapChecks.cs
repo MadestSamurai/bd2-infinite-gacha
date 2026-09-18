@@ -13,7 +13,7 @@ public static class BootstrapChecks
         {using var bytes=new MemoryStream();var result=CSharpCompilation.Create(name,[CSharpSyntaxTree.ParseText(source)],references,new CSharpCompilationOptions(kind,optimizationLevel:OptimizationLevel.Release)).Emit(bytes,manifestResources:resources);if(!result.Success)throw new Exception(string.Join("\n",result.Diagnostics));return bytes.ToArray();}
         var stub="""
 namespace BD2InfiniteGacha {
- public static class Identity {public const string Runtime="BD2InfiniteGacha.Runtime4";}
+ public static class Identity {public const string Runtime="BD2InfiniteGacha.Runtime5";}
  public class Snapshot {public string Runtime,State,Message;public long At;}
  public class RuntimeStatus {public string State;public string Error;public int ProcessId;public long ProcessStart;public long At;}
 }
@@ -31,7 +31,7 @@ namespace BD2InfiniteGacha.Runtime {
 """;
         string loader=Encoding.UTF8.GetString(HookCompiler.Resource("Hook.Loader.cs"));
         byte[] harmony=HookCompiler.Resource("BD2InfiniteGacha.Harmony.dll");
-        var payload=Compile("BD2InfiniteGacha.Runtime4",loader+stub,refs.Append(MetadataReference.CreateFromImage(harmony)),resources:[new ResourceDescription("BD2InfiniteGacha.Harmony.dll",()=>new MemoryStream(harmony),true)]);
+        var payload=Compile("BD2InfiniteGacha.Runtime5",loader+stub,refs.Append(MetadataReference.CreateFromImage(harmony)),resources:[new ResourceDescription("BD2InfiniteGacha.Harmony.dll",()=>new MemoryStream(harmony),true)]);
         using(var asm=AssemblyDefinition.ReadAssembly(new MemoryStream(payload)))
         {
             var type=asm.MainModule.GetType("BD2InfiniteGacha.Runtime.Loader");
