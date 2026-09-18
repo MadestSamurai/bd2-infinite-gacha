@@ -1,4 +1,4 @@
-# 0.2.0 · 首个公开版本 / First public release
+# 0.2.1 · 首个公开版本 / First public release
 
 ## 中文
 

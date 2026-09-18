@@ -74,7 +74,7 @@ Requires Windows x64 and the .NET 8 SDK. Normal builds and regression tests **do
 .\package.ps1 -Locked
 ```
 
-Assets are written to `dist/v0.2.0/`. See [development and compatibility](docs/DEVELOPMENT.md), [translation maintenance](docs/LOCALIZATION.md), and [release notes](docs/RELEASE_NOTES.md).
+Assets are written to `dist/v0.2.1/`. See [development and compatibility](docs/DEVELOPMENT.md), [translation maintenance](docs/LOCALIZATION.md), and [release notes](docs/RELEASE_NOTES.md).
 
 Client interfaces are resolved locally when connecting. No game assemblies, game data tables, captured accounts or replays are distributed. Interface changes that cannot be matched reliably produce a compatibility error.
 

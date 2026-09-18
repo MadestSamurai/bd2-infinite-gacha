@@ -30,7 +30,7 @@ This reads installed assemblies and compiles the hook offline. It does not injec
 
 ## Validation boundary
 
-The preceding private version was observed completing 33 rerolls and 34 native skips. Public 0.2.0 adds recovery behavior verified by deterministic fault-injection tests and two real client metadata/compilation checks. A long unattended game session is still useful to validate the new recovery behavior under naturally occurring faults; unit tests are not represented as server-side gameplay evidence.
+The preceding private version was observed completing 33 rerolls and 34 native skips. Public 0.2.1 adds recovery behavior verified by deterministic fault-injection tests and two real client metadata/compilation checks. A long unattended game session is still useful to validate the new recovery behavior under naturally occurring faults; unit tests are not represented as server-side gameplay evidence.
 
 ## 中文摘要
 

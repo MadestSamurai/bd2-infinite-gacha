@@ -74,7 +74,7 @@ Windows x64、.NET 8 SDK。普通编译和回归**不需要安装游戏**：
 .\package.ps1 -Locked
 ```
 
-产物在 `dist/v0.2.0/`。更多内容：[开发与兼容](docs/DEVELOPMENT.md) · [翻译维护](docs/LOCALIZATION.md) · [版本说明](docs/RELEASE_NOTES.md)。
+产物在 `dist/v0.2.1/`。更多内容：[开发与兼容](docs/DEVELOPMENT.md) · [翻译维护](docs/LOCALIZATION.md) · [版本说明](docs/RELEASE_NOTES.md)。
 
 工具连接时解析本机客户端接口，不附带游戏 DLL、游戏数据表、账号库或回放。发生无法可靠匹配的接口变更时会报告不兼容。
 

@@ -13,10 +13,13 @@ public static class BootstrapChecks
         {using var bytes=new MemoryStream();var result=CSharpCompilation.Create(name,[CSharpSyntaxTree.ParseText(source)],references,new CSharpCompilationOptions(kind,optimizationLevel:OptimizationLevel.Release)).Emit(bytes,manifestResources:resources);if(!result.Success)throw new Exception(string.Join("\n",result.Diagnostics));return bytes.ToArray();}
         var stub="""
 namespace BD2InfiniteGacha {
+ public static class Identity {public const string Runtime="BD2InfiniteGacha.Runtime4";}
+ public class Snapshot {public string Runtime,State,Message;public long At;}
  public class RuntimeStatus {public string State;public string Error;public int ProcessId;public long ProcessStart;public long At;}
 }
 namespace BD2InfiniteGacha.Runtime {
  internal static class Storage {
+  internal static void Write(string file,BD2InfiniteGacha.Snapshot snapshot){throw new System.InvalidOperationException("Read-only probe is not used in the bootstrap fixture");}
   internal static void Write(string file,BD2InfiniteGacha.RuntimeStatus status){System.IO.File.WriteAllText(System.IO.Path.Combine(System.Environment.GetEnvironmentVariable("GACHA_PROBE_OUTPUT"),file),status.State+"|"+status.Error);}
  }
  internal sealed class RuntimeEngine {
