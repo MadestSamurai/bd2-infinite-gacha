@@ -1,12 +1,10 @@
-# BD2 Infinite Gacha v0.2.2
+# BD2 Infinite Gacha vX.Y.Z
 
 ## 简体中文
 
 ### 更新内容
 
-- 卡池下拉框改为显示截止日期和时间，按新到旧排列，不再是一排相同的活动名。
-- 显示「当前结果」标记和卡池编号；时间采用电脑本地时区，悬停可查看时区及游戏活动名。
-- 没有提供日期的历史卡池排在末尾。切换语言或日期更新后，保留当前选择、A／B分组和停止条件。
+- 说明用户可以感知的变化。
 
 ### 下载
 
@@ -27,9 +25,7 @@
 
 ### Changes
 
-- The pool selector now shows end dates and times, newest first, instead of identical event names.
-- A **Current result** marker and pool IDs identify the event. Times use your computer’s local time zone; hover for the time zone and in-game name.
-- Pools without a supplied end date stay at the bottom. Language switches and date updates preserve your selection, targets and stop rules.
+- Describe a user-visible change.
 
 ### Downloads
 

@@ -35,3 +35,9 @@ The preceding private version was observed completing 33 rerolls and 34 native s
 ## 中文摘要
 
 日常构建不需要游戏。发布时应同时检查规则、恢复状态机、双语词条、两种成品界面和运行时依赖差异；有本机客户端时补充接口匹配与组件编译。服务端请求只允许一笔在途，结果未确定时不会重发。新增容错已做离线故障注入，长期自然实机表现仍需持续观察。
+
+## 文档格式 / Documentation format
+
+README、仓库简介和 Release 统一遵循 [Publication style](PUBLICATION_STYLE.md)。新版本从 [Release template](RELEASE_TEMPLATE.md) 开始，更新 [当前版本说明](RELEASE_NOTES.md) 后再打包。
+
+Use the shared format for READMEs, repository descriptions and releases. Update both languages and release notes before packaging.

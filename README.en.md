@@ -2,24 +2,26 @@
 
 > **Disclaimer:** Using this assistant carries risks, including account penalties or bans, game errors, and data loss. This project is not affiliated with the game publisher and does not guarantee safe use. Assess the risks and follow the game's rules; you assume responsibility for all risks and consequences of using the tool.
 
-English | [简体中文](README.md)
+English · [简体中文](README.md)
 
-A standalone Infinite Gacha assistant for the Brown Dust 2 Windows PC client. It reads the available costumes and your enhancement levels, rerolls according to priority groups and stop rules, skips draw animations, and stops on a match. You decide whether to keep the result in the game.
+[Download latest release](https://github.com/MadestSamurai/bd2-infinite-gacha/releases/latest) · [Report an issue](https://github.com/MadestSamurai/bd2-infinite-gacha/issues)
 
-[Download the latest release](https://github.com/MadestSamurai/bd2-infinite-gacha/releases/latest)
+A standalone Infinite Gacha assistant for the BrownDust II Windows client. Reads available costumes and enhancement levels, rerolls against A/B targets, skips animations, and keeps matching results for your confirmation.
 
-## Choose a build
+## Download
 
-Both builds include **English and Simplified Chinese**, switchable in the app.
+Current version: **0.2.2**. Both editions have the same features and include Simplified Chinese / English.
 
-| Build | Bundles .NET | Additional requirement | Recommended for |
-| --- | --- | --- | --- |
-| **Portable** | Yes | None | Most users |
-| **Lite** | No | .NET 8 Windows Desktop Runtime **x64** | Users who already have the runtime and prefer a smaller download |
+| Edition | Runtime requirement | Recommended for |
+| --- | --- | --- |
+| **Portable** | .NET included | Most users; download and run |
+| **Lite** | [.NET Desktop Runtime 8 x64](https://dotnet.microsoft.com/download/dotnet/8.0) | Smaller download if the runtime is installed |
 
-Download an EXE and run it. ZIPs also contain both READMEs and licenses. Verify downloads against `SHA256SUMS.txt` with PowerShell: `Get-FileHash file.exe -Algorithm SHA256`.
+Download one edition: the EXE runs on its own; ZIPs include both READMEs and licenses. No Python, development SDK or other BD2 tools are required. Lite needs the **Desktop Runtime**, not just .NET Runtime or ASP.NET Runtime. Verify downloads against `SHA256SUMS.txt`.
 
-## Getting started
+## Quick start
+
+**Before upgrading:** pause and close the old assistant, restart the game normally, then connect with the new version.
 
 1. Start the game and log in. Open Infinite Gacha, make the first 10-pull manually, and stay on the result screen.
 2. Open the assistant and select **Connect game**. Restart the game first if you upgraded the component or connected another tool in this game session.
@@ -27,11 +29,13 @@ Download an EXE and run it. ZIPs also contain both READMEs and licenses. Verify 
 4. Select priority targets in B and click **To A →**. Ctrl/Shift supports multiple selection; double-click or Enter transfers between groups, and Delete removes a target. Use **Add costumes…** for ungrouped costumes.
 5. Set the top A threshold and any lower-tier rules, then select **Start rerolling**. A match stops the assistant. Keeping or purchasing the result remains a manual decision in the game.
 
-Use the top-right language selector at any time. Switching languages does not restart rerolling or change your targets. Costume, character and pool names follow the **game's language**.
+## Features and settings
+
+### Pool selection
 
 The pool selector identifies events by **end date**, newest first. Dates use your computer’s local time zone; hover to see the time zone and the in-game event name. **Current result** marks the pool shown in the game. Pool IDs distinguish matching dates, and pools without a supplied end date stay at the bottom. Reordering preserves your targets and stop rules.
 
-## Stop rules
+### Stop rules
 
 A contains priority targets; B contains secondary targets. A costume belongs to at most one group. Set an unconditional A threshold from 1 to 10. Lower tiers appear automatically and can each be enabled separately.
 
@@ -51,7 +55,19 @@ Any enabled rule can stop the run. Lower tiers require an **exact A count**. A+B
 - **Reroll interval** defaults to 1000ms, adjustable from 100 to 60000ms. The previous complete result must be checked before the next request. Network and game animations can make the actual interval longer.
 - Targets and rules are saved separately per account and pool. Closing or stopping the assistant does not enable automatic restarting.
 
-## Recovery and diagnostics
+## Language
+
+Use **语言 / Language** in the top bar to switch between Simplified Chinese and English. The first launch uses Chinese on Chinese systems and English otherwise, then remembers your choice. Switching does not restart automation or change settings. Game-provided names and images keep their game language; raw diagnostics remain unchanged.
+
+See [translation maintenance](docs/LOCALIZATION.md).
+
+## Compatibility and limits
+
+Supports the official Windows x64 PC client, one game process at a time, with the same privilege level as the game. Mobile and Android emulator clients are not supported. First connection resolves local interfaces and builds the component, which may take a few seconds. Uncertain interface matches stop connection with a diagnostic; adaptation does not guarantee every future update will work without maintenance.
+
+Releases contain no game DLLs, resources, account inventories or private captures. Stops and keeps a matching preview; final confirmation or purchase remains your decision in the game.
+
+## Diagnostics and feedback
 
 Brief missing-state or UI transitions wait up to 15 seconds for recovery. Temporary file locks are retried without discarding the current task. Close game popups to continue automatically. Animation skipping uses the game's normal skip action.
 
@@ -69,17 +85,21 @@ Local data is stored in `%LOCALAPPDATA%\BD2InfiniteGacha\`:
 
 When reporting an issue, include the tool version, visible error and relevant event-log lines. Do not publish complete inventories, account files or personal data.
 
-## Build and contribute
+When reporting an issue, include the version, visible message and relevant log excerpts. Remove account information and personal paths first. Do not upload game DLLs, complete inventories or connection credentials.
 
-Requires Windows x64 and the .NET 8 SDK. Normal builds and regression tests **do not require the game**:
+## Development and contributions
+
+Requires Windows x64, PowerShell and the .NET 8 SDK. Normal builds and regression tests do not need or connect to the game.
 
 ```powershell
 .\build.ps1 -Locked
 .\package.ps1 -Locked
 ```
 
-Assets are written to `dist/v0.2.2/`. See [development and compatibility](docs/DEVELOPMENT.md), [translation maintenance](docs/LOCALIZATION.md), and [release notes](docs/RELEASE_NOTES.md).
+Assets are written to `dist/v<version>/`. Packaging checks both runtime configurations and runs UI checks.
 
-Client interfaces are resolved locally when connecting. No game assemblies, game data tables, captured accounts or replays are distributed. Interface changes that cannot be matched reliably produce a compatibility error.
+[Development and release workflow](docs/DEVELOPMENT.md) · [Documentation and release format](docs/PUBLICATION_STYLE.md) · [Current release notes](docs/RELEASE_NOTES.md)
 
-Project code is [MIT licensed](LICENSE). Dependencies retain their [third-party licenses](THIRD_PARTY_NOTICES.md). This is an independent community tool, not affiliated with the game's publisher.
+## License
+
+Project code is [MIT licensed](LICENSE). Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md). This project is not affiliated with the game developer or publisher.
