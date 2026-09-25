@@ -20,7 +20,7 @@ public partial class MainWindow:Window
     private readonly CancellationTokenSource lifetime=new();
     public MainWindow(IClientPort port,string root,bool smoke)
     {
-        InitializeComponent();language=new WindowLanguage(this,LanguagePreference.Read(root));Ui.Catalog=language.Catalog;LanguageChoice.SelectedIndex=language.Catalog.Language=="zh-CN"?0:1;this.port=port;this.root=root;this.smoke=smoke;controller=new(port,record:(state,message)=>Diagnostics.Write(root,"desktop",state,message));preferences=new(root);controller.Stop();
+        InitializeComponent();BD2.Distribution.DistributionNotice.Attach(this,LanguageChoice);language=new WindowLanguage(this,LanguagePreference.Read(root));Ui.Catalog=language.Catalog;LanguageChoice.SelectedIndex=language.Catalog.Language=="zh-CN"?0:1;this.port=port;this.root=root;this.smoke=smoke;controller=new(port,record:(state,message)=>Diagnostics.Write(root,"desktop",state,message));preferences=new(root);controller.Stop();
         bView=new ListCollectionView(costumes){Filter=x=>((CostumeRow)x).Group==2&&Matches(x)};aView=new ListCollectionView(costumes){Filter=x=>((CostumeRow)x).Group==1&&Matches(x)};
         BList.ItemsSource=bView;AList.ItemsSource=aView;Conditions.ItemsSource=conditions;
         timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(400)};timer.Tick+=(_,_)=>Poll();
