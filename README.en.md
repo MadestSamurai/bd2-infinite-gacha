@@ -12,7 +12,7 @@ A standalone Infinite Gacha assistant for the BrownDust II Windows client. Reads
 
 ## Download
 
-Current version: **0.2.3**. Both editions have the same features and include Simplified Chinese / English.
+Source version: **0.2.6**. Both editions have the same features and include Simplified Chinese / English.
 
 | Edition | Runtime requirement | Recommended for |
 | --- | --- | --- |
@@ -23,10 +23,10 @@ Download one edition: the EXE runs on its own; ZIPs include both READMEs and lic
 
 ## Quick start
 
-**Before upgrading:** pause and close the old assistant, restart the game normally, then connect with the new version.
+**Before upgrading:** stop and close the old assistant. Follow the connection and tool switching section below; current components support same-process handoff.
 
 1. Start the game and log in. Open Infinite Gacha, make the first 10-pull manually, and stay on the result screen.
-2. Open the assistant and select **Connect game**. Restart the game first if you upgraded the component or connected another tool in this game session.
+2. Open the assistant and select **Connect game**. For legacy components, follow the upgrade instructions below.
 3. Select **Add unmaxed → B** to add unowned and +0 through +4 costumes to the left-hand B list.
 4. Select priority targets in B and click **To A →**. Ctrl/Shift supports multiple selection; double-click or Enter transfers between groups, and Delete removes a target. Use **Add costumes…** for ungrouped costumes.
 5. Set the top A threshold and any lower-tier rules, then select **Start rerolling**. A match stops the assistant. Keeping or purchasing the result remains a manual decision in the game.
@@ -36,6 +36,14 @@ Download one edition: the EXE runs on its own; ZIPs include both READMEs and lic
 ### Pool selection
 
 The pool selector identifies events by **end date**, newest first. Dates use your computer’s local time zone; hover to see the time zone and the in-game event name. **Current result** marks the pool shown in the game. Pool IDs distinguish matching dates, and pools without a supplied end date stay at the bottom. Reordering preserves your targets and stop rules.
+
+### Target reached alerts
+
+The bottom of the window offers **Windows notification, Popup and Sound**. Combine them freely or turn them all off; only Windows notification is on by default. **Test alerts** checks the selected methods without starting draws or changing an active run.
+
+Preferences are saved across accounts and pools, and can be adjusted while rerolling. Alerts fire once after this run reaches its target and stops, with A/B counts and the reroll count. Manual stops, errors and old results after reopening the app do not trigger completion alerts. The popup only shows the result; confirm keeping/purchasing it in the game.
+
+Windows notification and Do not disturb settings may suppress notifications. Sound follows your system volume and sound scheme. The notification and popup are silent unless the separate Sound option is enabled.
 
 ### Stop rules
 
@@ -105,3 +113,7 @@ Assets are written to `dist/v<version>/`. Packaging checks both runtime configur
 ## License
 
 Project code is [MIT licensed](LICENSE). Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md). This project is not affiliated with the game developer or publisher.
+
+## Connection and tool switching
+
+When upgrading from an older release for the first time, close the old tools and restart the game once. These updated tools can then update and switch within the same game process: pending game operations finish before control changes. Settings and records are retained. Live communication uses local named pipes. Modules used by the daily workflow are coordinated separately by its scheduler.

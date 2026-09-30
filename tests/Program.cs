@@ -143,10 +143,65 @@ Test("persistent missing UI and unrecovered result animation stop with reasons",
  now=s.At+TimeSpan.FromSeconds(121).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;
  Check(!m.Step(c,s,1,0,0,now)&&m.State=="error"&&m.Message.Contains("120"),"animation deadline separate from server timeout");
 });
+Test("unconnected window can initialize and close without writing to a game",()=>{
+ var port=new FakePort(Snap()){FailWrites=true};var client=new ClientController(port);
+ client.Stop();client.Stop();Check(!client.Running,"idle stop does not require a pipe or controller lease");
+});
+Test("matched notification is consumed once after stopping",()=>{
+ var port=new FakePort(Snap());var client=new ClientController(port);client.Start(port.S,port.S.Pools[0],Draft());
+ port.S.Result=Cards(3,2);port.S.Owner=port.Last.Owner;port.S.State="matched";port.S.Rolls=7;
+ client.Poll(port.S);Check(!client.Running&&!port.Last.Enabled,"stopped before notification");
+ var notice=client.TakeMatch();Check(notice is {A:3,B:2,Rolls:7,Pool:10},"complete immutable result");
+ for(int i=0;i<20;i++){client.Poll(port.S);Check(client.TakeMatch()==null,"no repeat while result remains");}
+ var reopened=new ClientController(port);reopened.Poll(port.S);Check(reopened.TakeMatch()==null,"old matched result ignored after restart");
+ client.Start(port.S,port.S.Pools[0],Draft());port.S.Owner=port.Last.Owner;client.Poll(port.S);Check(client.TakeMatch()!=null,"explicit new run can match same cards");
+});
+Test("stops and invalid matched snapshots never notify",()=>{
+ foreach(string reason in new[]{"manual","error","stopped","owner","account","pool","pool-key","incomplete","not-ready","not-matched","stale"}){
+  var port=new FakePort(Snap());var client=new ClientController(port);client.Start(port.S,port.S.Pools[0],Draft());
+  port.S.Owner=port.Last.Owner;port.S.State="matched";port.S.Result=Cards(3,0);
+  switch(reason){case "manual":client.Stop();break;case "error":case "stopped":port.S.State=reason;break;
+   case "owner":port.S.Owner="foreign";break;case "account":port.S.Account=new string('b',64);break;
+   case "pool":port.S.PoolId++;break;case "pool-key":port.S.Pools[0].Key="new-key";break;
+   case "incomplete":port.S.Result=[1,1,1];break;case "not-ready":port.S.ResultReady=false;break;
+   case "not-matched":port.S.Result=Cards(0,0);break;case "stale":port.S.At-=TimeSpan.FromSeconds(8).Ticks;break;}
+  client.Poll(port.S);Check(client.TakeMatch()==null,"no false alert: "+reason);
+ }
+});
+Test("runtime terminal result remains alertable if final lease write fails",()=>{
+ var port=new FakePort(Snap());var client=new ClientController(port);client.Start(port.S,port.S.Pools[0],Draft());
+ port.S.Result=Cards(3,0);port.S.Owner=port.Last.Owner;port.S.State="matched";port.FailWrites=true;
+ Throws(()=>client.Poll(port.S));Check(!client.Running&&client.TakeMatch()!=null,"runtime already stopped and completion retained");
+});
+Test("notification preferences are global independent and survive reload",()=>{
+ string dir=Path.Combine(root,"notifications-"+Guid.NewGuid().ToString("N"));var store=new NotificationPreferences(dir);
+ Check(store.Load() is {Windows:true,Popup:false,Sound:false},"unobtrusive defaults");
+ Directory.CreateDirectory(dir);File.WriteAllText(Path.Combine(dir,"settings.json"),"original account rules");
+ for(int mask=0;mask<8;mask++){
+  store.Save(new(){Windows=(mask&1)!=0,Popup=(mask&2)!=0,Sound=(mask&4)!=0});var o=new NotificationPreferences(dir).Load();
+  Check(o.Windows==((mask&1)!=0)&&o.Popup==((mask&2)!=0)&&o.Sound==((mask&4)!=0)&&o.Any==(mask!=0),"persist all combinations");
+ }
+ Check(File.ReadAllText(Path.Combine(dir,"settings.json"))=="original account rules","never rewrites rules");
+ File.WriteAllText(Path.Combine(dir,"notifications.json"),"bad-json");Throws(()=>store.Load());Check(File.ReadAllText(Path.Combine(dir,"notifications.json"))=="bad-json","read failure preserves evidence");
+});
+Test("all notification combinations dispatch independently",()=>{
+ for(int mask=0;mask<8;mask++){
+  var sink=new FakeNotifications();var options=new NotificationOptions{Windows=(mask&1)!=0,Popup=(mask&2)!=0,Sound=(mask&4)!=0};
+  Check(NotificationDelivery.Send(options,sink,"title","message").Length==0,"delivery");
+  Check(sink.Sent.Contains(NotificationChannel.Windows)==options.Windows&&sink.Sent.Contains(NotificationChannel.Popup)==options.Popup&&sink.Sent.Contains(NotificationChannel.Sound)==options.Sound,"only selected channels");
+ }
+ var failed=new FakeNotifications{Fail=NotificationChannel.Windows};var errors=NotificationDelivery.Send(new(){Windows=true,Popup=true,Sound=true},failed,"title","message");
+ Check(errors.Length==1&&errors[0].Channel==NotificationChannel.Windows&&failed.Sent.Count==3,"failed system notification does not suppress remaining channels");
+});
 Test("bilingual catalogs and source coverage",()=>{assertions+=LocalizationTests.Run();});
 JsonFiles.Write(Path.Combine(root,"checks.json"),new{status="passed",scenarios=checks.Count,assertions,checks,realGameTouched=false});Console.WriteLine($"{checks.Count} scenarios / {assertions} assertions passed");
 sealed class FakePort(Snapshot s):IClientPort{
  public Snapshot S=s;public Control Last=new();public bool FailWrites;private readonly GameProcess process=new(s.ProcessId,s.ProcessStart,"fake.exe");
  public GameProcess? Find()=>process;public Snapshot? Read()=>S;public void Write(Control command){if(FailWrites)throw new IOException("fixture lock");Last=JsonFiles.Clone(command);}
  public Task ConnectAsync(Action<string> progress,CancellationToken cancellation)=>Task.CompletedTask;
+}
+
+sealed class FakeNotifications:INotificationSink{
+ public List<NotificationChannel> Sent=new();public NotificationChannel? Fail;
+ public void Send(NotificationChannel channel,string title,string message){Sent.Add(channel);if(Fail==channel)throw new IOException("fixture notification unavailable");}
 }

@@ -18,8 +18,8 @@ namespace BD2InfiniteGacha.Runtime
             }catch{}
         }
         internal static T Read<T>(string name) where T:class
-        {try{using(var f=new FileStream(Path.Combine(Identity.Root,name),FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))return (T)new DataContractJsonSerializer(typeof(T)).ReadObject(f);}catch{return null;}}
+        {try{using(var f=new MemoryStream(BD2.LocalIpc.RuntimeFiles.Read(Path.Combine(Identity.Root,name))??new byte[0]))return (T)new DataContractJsonSerializer(typeof(T)).ReadObject(f);}catch{return null;}}
         internal static void Write(string name,object value)
-        {Directory.CreateDirectory(Identity.Root);var path=Path.Combine(Identity.Root,name);var temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";try{using(var f=File.Create(temp))new DataContractJsonSerializer(value.GetType()).WriteObject(f,value);if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}finally{if(File.Exists(temp))File.Delete(temp);}}
+        {using(var buffer=new MemoryStream()){new DataContractJsonSerializer(value.GetType()).WriteObject(buffer,value);if(BD2.LocalIpc.RuntimeFiles.Write(Path.Combine(Identity.Root,name),buffer.ToArray()))return;}Directory.CreateDirectory(Identity.Root);var path=Path.Combine(Identity.Root,name);var temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";try{using(var f=File.Create(temp))new DataContractJsonSerializer(value.GetType()).WriteObject(f,value);if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}finally{if(File.Exists(temp))File.Delete(temp);}}
     }
 }

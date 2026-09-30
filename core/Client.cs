@@ -6,8 +6,8 @@ namespace BD2InfiniteGacha;
 public static class JsonFiles
 {
     public static readonly JsonSerializerOptions Options=new(){IncludeFields=true,WriteIndented=true};
-    public static T? Read<T>(string path)where T:class{try{using var f=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);return JsonSerializer.Deserialize<T>(f,Options);}catch(Exception e)when(e is IOException or UnauthorizedAccessException or JsonException){return null;}}
-    public static void Write<T>(string path,T value){Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";try{using(var f=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){JsonSerializer.Serialize(f,value,Options);f.Flush(true);}File.Move(temp,path,true);}finally{if(File.Exists(temp))File.Delete(temp);}}
+    public static T? Read<T>(string path)where T:class{try{if(BD2.LocalIpc.DesktopFiles.Read(path,out var live))return live==null?null:JsonSerializer.Deserialize<T>(live,Options);using var f=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);return JsonSerializer.Deserialize<T>(f,Options);}catch(Exception e)when(e is IOException or UnauthorizedAccessException or JsonException){return null;}}
+    public static void Write<T>(string path,T value){if(BD2.LocalIpc.DesktopFiles.Write(path,JsonSerializer.SerializeToUtf8Bytes(value,Options)))return;Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";try{using(var f=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){JsonSerializer.Serialize(f,value,Options);f.Flush(true);}File.Move(temp,path,true);}finally{if(File.Exists(temp))File.Delete(temp);}}
     public static T Clone<T>(T value)=>JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value,Options),Options)!;
 }
 public sealed class Preferences
@@ -27,7 +27,7 @@ public interface IClientPort
 public sealed class GamePort:IClientPort
 {
     private readonly string root;
-    public GamePort(string? root=null){this.root=root??Identity.Root;}
+    public GamePort(string? root=null){this.root=root??Identity.Root;BD2.LocalIpc.DesktopFiles.Configure(this.root,Identity.LiveEntries);}
     public GameProcess? Find(){var all=Process.GetProcessesByName("BrownDust II");try{if(all.Length>1)throw new InvalidOperationException("检测到多个游戏进程，请只保留一个。");if(all.Length==0)return null;var p=all[0];return new(p.Id,p.StartTime.ToUniversalTime().Ticks,p.MainModule?.FileName??throw new InvalidOperationException("无法读取游戏路径，请使用与游戏相同的权限。"));}finally{foreach(var p in all)p.Dispose();}}
     public Snapshot? Read()=>JsonFiles.Read<Snapshot>(Path.Combine(root,"snapshot.json"));
     public void Write(Control command)=>JsonFiles.Write(Path.Combine(root,"control.json"),command);
@@ -35,16 +35,9 @@ public sealed class GamePort:IClientPort
     {public int ProcessId{get;set;}public long Start{get;set;}public string Fingerprint{get;set;}="";public long Address{get;set;}public string Error{get;set;}="";}
     public async Task ConnectAsync(Action<string> progress,CancellationToken cancellation)
     {
-        var game=Find()??throw new InvalidOperationException("请先启动并登录游戏。");var path=Path.Combine(root,"connection.json");var old=JsonFiles.Read<Connection>(path);
-        if(File.Exists(path)&&old==null)throw new InvalidDataException("连接记录暂时无法读取，请关闭占用它的程序后重试。");
-        if(old?.ProcessId==game.Id&&old.Start==game.Start)
-        {
-            if(old.Fingerprint!=HookCompiler.Fingerprint)throw new InvalidOperationException("游戏已加载另一版本组件，请正常重启游戏后连接。");
-            if(old.Error!="")throw new InvalidOperationException(old.Error+"；请正常重启游戏后重试。");
-            var status=JsonFiles.Read<RuntimeStatus>(Path.Combine(root,"runtime.json"));
-            if(status?.ProcessId==game.Id&&status.ProcessStart==game.Start&&status.State=="error")throw new InvalidOperationException(status.Error);
-            progress("已连接组件，等待游戏状态");return;
-        }
+        var game=Find()??throw new InvalidOperationException("请先启动并登录游戏。");var path=Path.Combine(root,"connection.json");var pipe=BD2.LocalIpc.DesktopFiles.Connect(root,game.Id,game.Start);
+        try{if(pipe.Fingerprint()==HookCompiler.Fingerprint){var status=JsonFiles.Read<RuntimeStatus>(Path.Combine(root,"runtime.json"));if(status?.State=="active"&&status.At>DateTime.UtcNow.AddSeconds(-5).Ticks){pipe.Open(HookCompiler.Fingerprint);progress("已连接组件，等待游戏状态");return;}}}
+        catch(BD2.LocalIpc.LeaseRevokedException){}catch(TimeoutException){}catch(IOException){}
         progress("解析本机客户端接口并准备组件…");
         string managed=Path.Combine(Path.GetDirectoryName(game.File)!,Path.GetFileNameWithoutExtension(game.File)+"_Data","Managed");
         var prepared=await Task.Run(()=>HookCompiler.Prepare(managed),cancellation);JsonFiles.Write(Path.Combine(root,"compatibility.json"),prepared.Report);
@@ -53,13 +46,25 @@ public sealed class GamePort:IClientPort
         var current=new Connection{ProcessId=game.Id,Start=game.Start,Fingerprint=HookCompiler.Fingerprint};JsonFiles.Write(path,current);progress("连接组件…");
         try{await Task.Run(()=>{using var injector=new Injector(game.Id);current.Address=injector.Inject(prepared.Payload,"BD2InfiniteGacha.Runtime","Loader","Load").ToInt64();},CancellationToken.None);JsonFiles.Write(path,current);}
         catch(Exception e){current.Error=e.Message;JsonFiles.Write(path,current);throw;}
-        cancellation.ThrowIfCancellationRequested();
+        var deadline=DateTime.UtcNow.AddSeconds(35);
+        while(DateTime.UtcNow<deadline){
+            cancellation.ThrowIfCancellationRequested();
+            var status=JsonFiles.Read<RuntimeStatus>(Path.Combine(root,"runtime.json"));
+            if(status?.ProcessId==game.Id&&status.ProcessStart==game.Start){
+                if(status.State=="error")throw new InvalidOperationException(status.Error);
+                if(status.State=="active"){pipe.Open(HookCompiler.Fingerprint);return;}
+            }
+            await Task.Delay(100,cancellation);
+        }
+        throw new IOException("组件交接尚未完成，请等待当前操作结算后重新连接，游戏可以保持运行。");
     }
 }
 public sealed class ClientController
 {
     private readonly IClientPort port;private readonly Func<long> clock;private readonly Action<string,string>? record;private Control? active;
     private long? unavailableSince,writeFailedSince;private long renewedAt;
+    private MatchNotice? pendingMatch;
+    public MatchNotice? TakeMatch(){var value=pendingMatch;pendingMatch=null;return value;}
     public bool Running=>active!=null;
     public string Notice{get;private set;}="";
     public ClientController(IClientPort port,Func<long>? clock=null,Action<string,string>? record=null){this.port=port;this.clock=clock??(()=>DateTime.UtcNow.Ticks);this.record=record;}
@@ -71,6 +76,7 @@ public sealed class ClientController
         if(!Fresh(s,port.Find(),clock())||s.Account.Length!=64)throw new InvalidOperationException("游戏状态已过期，请连接后重新开始。");
         if(!s.ResultReady||s.PoolId!=pool.Id||s.Locked)throw new InvalidOperationException("请进入所选无限抽抽乐的十连结果页，完成动画并处理锁定状态。");
         string error=Rules.Validate(draft,pool.Costumes);if(error!="")throw new InvalidOperationException(error);
+        pendingMatch=null;
         active=new Control{Enabled=true,Owner=Guid.NewGuid().ToString("N"),Account=s.Account,PoolId=pool.Id,PoolKey=pool.Key,ProcessId=s.ProcessId,ProcessStart=s.ProcessStart,Rules=JsonFiles.Clone(draft),Expires=clock()+TimeSpan.FromSeconds(20).Ticks};
         try{port.Write(active);renewedAt=clock();unavailableSince=writeFailedSince=null;Note("");record?.Invoke("start",active.Owner);}catch{active=null;throw;}
     }
@@ -81,7 +87,12 @@ public sealed class ClientController
         if(game==null||game.Id!=active.ProcessId||game.Start!=active.ProcessStart){Stop("游戏进程已退出或变化");return;}
         if(!Fresh(s,game,now)){Unavailable(now);return;}
         if(s!.Account.Length>0&&s.Account!=active.Account){Stop("账号已变化，请重新开始");return;}
-        if(s.Owner==active.Owner&&s.State is "matched" or "error" or "stopped"){Stop(s.Message);return;}
+        if(s.Owner==active.Owner&&s.State is "matched" or "error" or "stopped")
+        {
+            var completion=MatchNotice.From(active,s);
+            try{Stop(s.Message);}finally{pendingMatch=completion;}
+            return;
+        }
         if(s.Account.Length==0){Unavailable(now);return;}
         unavailableSince=null;
         if(now-renewedAt<TimeSpan.FromSeconds(2).Ticks){if(writeFailedSince==null)Note("");return;}
@@ -94,6 +105,6 @@ public sealed class ClientController
     {
         bool wasRunning=active!=null;active=null;unavailableSince=writeFailedSince=null;
         if(wasRunning){Note(reason);record?.Invoke("stop",reason);}
-        port.Write(new Control());
+        if(wasRunning)port.Write(new Control());
     }
 }

@@ -18,14 +18,21 @@ public partial class MainWindow:Window
     private ListCollectionView? bView,aView;
     private RuleDraft draft=new();private Snapshot? snapshot;private Pool? pool;private string account="",catalogKey="",poolListKey="",resultKey="";private int shownTop,lastActivePool;private bool updating,connecting;private readonly DispatcherTimer timer;
     private readonly CancellationTokenSource lifetime=new();
+    private readonly NotificationPreferences notificationPreferences;
+    private readonly CompletionNotifications notifications;
+    private NotificationOptions notificationOptions=new();
+    private readonly List<NotificationChannel> smokeNotifications=new();
     public MainWindow(IClientPort port,string root,bool smoke)
     {
         InitializeComponent();BD2.Distribution.DistributionNotice.Attach(this,LanguageChoice);language=new WindowLanguage(this,LanguagePreference.Read(root));Ui.Catalog=language.Catalog;LanguageChoice.SelectedIndex=language.Catalog.Language=="zh-CN"?0:1;this.port=port;this.root=root;this.smoke=smoke;controller=new(port,record:(state,message)=>Diagnostics.Write(root,"desktop",state,message));preferences=new(root);controller.Stop();
+        notificationPreferences=new(root);notifications=new(this);
+        try{notificationOptions=notificationPreferences.Load();}catch(Exception e){Error(e);}
+        NotifyWindows.IsChecked=notificationOptions.Windows;NotifyPopup.IsChecked=notificationOptions.Popup;NotifySound.IsChecked=notificationOptions.Sound;TestNotification.IsEnabled=notificationOptions.Any;
         bView=new ListCollectionView(costumes){Filter=x=>((CostumeRow)x).Group==2&&Matches(x)};aView=new ListCollectionView(costumes){Filter=x=>((CostumeRow)x).Group==1&&Matches(x)};
         BList.ItemsSource=bView;AList.ItemsSource=aView;Conditions.ItemsSource=conditions;
         timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(400)};timer.Tick+=(_,_)=>Poll();
         Loaded+=async(_,_)=>{Poll();timer.Start();if(smoke)await SmokeAsync();};
-        Closing+=(_,_)=>{language.Dispose();timer.Stop();lifetime.Cancel();try{controller.Stop();}catch{}};
+        Closing+=(_,_)=>{notifications.Dispose();language.Dispose();timer.Stop();lifetime.Cancel();try{controller.Stop();}catch{}};
     }
     private void Language_Changed(object sender,SelectionChangedEventArgs e)
     {
@@ -71,8 +78,30 @@ public partial class MainWindow:Window
             StatusText.Foreground=(Brush)FindResource(next.State=="error"?"Error":next.State=="matched"?"Success":"Ink");
             if(resultKey!=next.ResultKey){resultKey=next.ResultKey;ShowResult();if(next.ResultReady&&(controller.Running||next.State=="matched"))ResultExpander.IsExpanded=true;}
             SetEnabled();
+            var matched=controller.TakeMatch();
+            if(matched!=null){ResultExpander.IsExpanded=true;ShowResult();DeliverNotification(false,matched);}
         }catch(Exception e){Error(e);try{controller.Stop();}catch{}SetEnabled();}
     }
+    private void Notification_Changed(object sender,RoutedEventArgs e)
+    {
+        if(notificationPreferences==null)return;
+        var next=new NotificationOptions{Windows=NotifyWindows.IsChecked==true,Popup=NotifyPopup.IsChecked==true,Sound=NotifySound.IsChecked==true};
+        try{notificationPreferences.Save(next);notificationOptions=next;TestNotification.IsEnabled=next.Any;}
+        catch(Exception ex){NotifyWindows.IsChecked=notificationOptions.Windows;NotifyPopup.IsChecked=notificationOptions.Popup;NotifySound.IsChecked=notificationOptions.Sound;Error(ex);}
+    }
+    private void TestNotification_Click(object sender,RoutedEventArgs e)=>DeliverNotification(true,null);
+    private void DeliverNotification(bool test,MatchNotice? matched)
+    {
+        string title=Ui.Text(test?"测试提醒":"抽卡目标已达成");
+        string message=test?Ui.Text("这是一条测试提醒，不会开始抽卡或改变当前任务。"):
+            string.Format(Ui.Text("已停止刷新。A {0} / B {1}，本次刷新 {2} 次。请在游戏内确认保留结果。"),matched!.A,matched.B,matched.Rolls);
+        INotificationSink sink=smoke?new RecordingNotifications(smokeNotifications):notifications;
+        var failures=NotificationDelivery.Send(notificationOptions,sink,title,message);
+        foreach(var failure in failures)Diagnostics.Write(root,"notification",failure.Channel.ToString(),failure.Error);
+        if(failures.Length>0){StatusText.Text=Ui.Text("部分提醒未能发送：")+string.Join(" / ",failures.Select(f=>Ui.Text(f.Error)));StatusText.Foreground=(Brush)FindResource("Error");}
+    }
+    private sealed class RecordingNotifications(List<NotificationChannel> channels):INotificationSink
+    {public void Send(NotificationChannel channel,string title,string message)=>channels.Add(channel);}
     private void RefreshPoolList(Snapshot next)
     {
         var choices=PoolChoice.Create(next.Pools,next.PoolId,Ui.Catalog,TimeZoneInfo.Local);
@@ -178,6 +207,11 @@ public partial class MainWindow:Window
         try{
             LanguageChoice.SelectedIndex=0;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
             Check(costumes.Count==10&&conditions.Count==0,"initial pool and progressive conditions");
+            Check(NotifyWindows.IsChecked==true&&NotifyPopup.IsChecked==false&&NotifySound.IsChecked==false,"Windows-only alert default");
+            NotifyPopup.IsChecked=true;NotifySound.IsChecked=true;Notification_Changed(this,new());
+            TestNotification_Click(this,new());Check(smokeNotifications.Count==3&&!controller.Running,"test alerts route all channels without starting");
+            Check(new NotificationPreferences(root).Load() is {Windows:true,Popup:true,Sound:true},"alert preferences persist");
+            smokeNotifications.Clear();
             Check(BList.Items.Count==0&&AList.Items.Count==0,"two empty target lists");
             Check(Pools.Items.Cast<PoolChoice>().Select(p=>p.Pool.Id).SequenceEqual(new[]{66,55,44,77})&&pool!.Id==55,"latest date first while retaining native current pool");
             Pools.IsDropDownOpen=true;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("pool-dropdown",(FrameworkElement)((System.Windows.Controls.Primitives.Popup)Pools.Template.FindName("PART_Popup",Pools)).Child);Pools.IsDropDownOpen=false;
@@ -216,14 +250,37 @@ public partial class MainWindow:Window
             Check(Title=="BD2 Infinite Gacha"&&StartButton.Content.ToString()=="Start rerolling"&&BHeading.Text=="B · Secondary targets","English static UI");
             Check(costumes[0].LevelLabel=="+5"&&costumes[5].LevelLabel=="Not owned"&&conditions[0].Label.Contains("at least"),"English bound model labels");
             Check(((PoolChoice)Pools.SelectedItem).Title.StartsWith("Ends ")&&((PoolChoice)Pools.SelectedItem).Subtitle.Contains("Current result"),"English date labels update during active run");
+            Check(NotifyWindows.Content.ToString()=="Windows notification"&&NotifyPopup.Content.ToString()=="Popup"&&TestNotification.Content.ToString()=="Test alerts","English alert controls");
+            NotifyWindows.IsChecked=false;NotifyPopup.IsChecked=false;NotifySound.IsChecked=false;Notification_Changed(this,new());
+            Check(!TestNotification.IsEnabled&&controller.Running&&((DemoPort)port).Last.Owner==owner,"disable alerts without changing active run");
+            NotifyWindows.IsChecked=true;NotifyPopup.IsChecked=true;NotifySound.IsChecked=true;Notification_Changed(this,new());
+            TestNotification_Click(this,new());Check(controller.Running&&smokeNotifications.Count==3,"test during running preserves run");smokeNotifications.Clear();
             Check(LanguagePreference.Read(root)=="en-US","language persisted separately");Stop_Click(this,new());Width=1260;Height=900;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("english");
             var englishPicker=new AddCostumesWindow(costumes.Where(c=>c.Available&&c.Group==0),Resources){Owner=this};
             englishPicker.Loaded+=(_,_)=>englishPicker.Dispatcher.BeginInvoke(()=>{Check(englishPicker.Title=="Add costumes","English picker title");englishPicker.Close();});englishPicker.ShowDialog();
             Width=1060;Height=760;await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("english-compact");
             LanguageChoice.SelectedIndex=0;Check(Title=="BD2 无限抽抽乐助手"&&StartButton.Content.ToString()=="开始刷新","Chinese round trip");
             Check(!controller.Running,"language switch does not auto-start");
+            Start_Click(this,new());var demo=(DemoPort)port;demo.Snapshot.Owner=demo.Last.Owner;demo.Snapshot.State="matched";
+            Poll();Check(!controller.Running&&!demo.Last.Enabled&&smokeNotifications.Count==3,"matched result stops then alerts once");
+            Poll();Poll();Check(smokeNotifications.Count==3,"same snapshot does not repeat notifications");
+            notifications.Send(NotificationChannel.Popup,Ui.Text("抽卡目标已达成"),Ui.Text("这是一条测试提醒，不会开始抽卡或改变当前任务。"));
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            Check(notifications.ActivePopup?.IsVisible==true,"real WPF alert opens without a modal dispatcher");
+            Capture("notification-popup",(FrameworkElement)notifications.ActivePopup!.Content);notifications.ActivePopup.Close();
+            LanguageChoice.SelectedIndex=1;
+            notifications.Send(NotificationChannel.Popup,Ui.Text("抽卡目标已达成"),Ui.Text("这是一条测试提醒，不会开始抽卡或改变当前任务。"));
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("notification-popup-english",(FrameworkElement)notifications.ActivePopup!.Content);notifications.ActivePopup.Close();
             JsonFiles.Write(Path.Combine(root,"smoke.json"),new{status="passed",checks,realGameTouched=false});Application.Current.Shutdown();
         }catch(Exception ex){JsonFiles.Write(Path.Combine(root,"smoke.json"),new{status="failed",checks,error=ex.ToString()});Application.Current.Shutdown(1);}
+    }
+    internal async void NativeNotificationSmoke()
+    {
+        try{
+            var failures=NotificationDelivery.Send(new(){Windows=true,Sound=true,Popup=false},notifications,Ui.Text("测试提醒"),Ui.Text("这是一条测试提醒，不会开始抽卡或改变当前任务。"));
+            JsonFiles.Write(Path.Combine(root,"notification-smoke.json"),new{status=failures.Length==0?"accepted":"failed",failures,realGameTouched=false,visibleAndAudibleDeliveryNotAssumed=true});
+            await Task.Delay(4000);Application.Current.Shutdown(failures.Length==0?0:1);
+        }catch(Exception ex){JsonFiles.Write(Path.Combine(root,"notification-smoke.json"),new{status="failed",error=ex.ToString()});Application.Current.Shutdown(1);}
     }
     internal void SnapshotSmoke()
     {

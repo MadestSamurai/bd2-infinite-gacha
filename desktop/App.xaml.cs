@@ -11,12 +11,24 @@ public partial class App:Application
         base.OnStartup(e);var locale=new LanguageCatalog(LanguagePreference.Read(Identity.Root));
         if(e.Args.Length==3&&e.Args[0]=="--check-client")
         {try{var p=HookCompiler.Prepare(e.Args[1]);Directory.CreateDirectory(e.Args[2]);File.WriteAllBytes(Path.Combine(e.Args[2],Identity.Runtime+".dll"),p.Payload);JsonFiles.Write(Path.Combine(e.Args[2],"compatibility.json"),p.Report);Shutdown();}catch(Exception ex){JsonFiles.Write(Path.Combine(e.Args[2],"error.json"),new{error=ex.ToString()});Shutdown(1);}return;}
-        if(e.Args.Length==2&&e.Args[0]=="--identity"){JsonFiles.Write(e.Args[1],new{version=Identity.Version,runtime=Identity.Runtime,fingerprint=HookCompiler.Fingerprint});Shutdown();return;}
+        if(e.Args.Length==2&&e.Args[0]=="--identity"){JsonFiles.Write(e.Args[1],new{version=ApplicationInfo.Version,runtime=Identity.Runtime,fingerprint=HookCompiler.Fingerprint});Shutdown();return;}
         try{
+            if(e.Args.Length==2&&e.Args[0]=="--startup-smoke"){
+                string root=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(root);
+                // Exercise the real disconnected transport, not the demo port.
+                var window=new MainWindow(new GamePort(root),root,false);
+                window.Loaded+=(_,_)=>{JsonFiles.Write(Path.Combine(root,"startup.json"),new{status="passed",windowVisible=window.IsVisible,realTransport=true,lease=BD2.LocalIpc.DesktopFiles.HasLease(root)});window.Close();};
+                window.Show();return;
+            }
             if(e.Args.Length==3&&e.Args[0]=="--snapshot-smoke"){
                 var snapshot=JsonFiles.Read<Snapshot>(e.Args[1])??throw new InvalidDataException("Snapshot missing");
                 string root=Path.GetFullPath(e.Args[2]);var window=new MainWindow(new DemoPort(snapshot),root,false);
                 window.Loaded+=async(_,_)=>{await window.Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ApplicationIdle);window.SnapshotSmoke();};
+                window.Show();return;
+            }
+            if(e.Args.Length==2&&e.Args[0]=="--notification-smoke"){
+                var root=Path.GetFullPath(e.Args[1]);var window=new MainWindow(new DemoPort(),root,false);
+                window.Loaded+=async(_,_)=>{await window.Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ApplicationIdle);window.NativeNotificationSmoke();};
                 window.Show();return;
             }
             if(e.Args.Length==2&&e.Args[0]=="--smoke"){string root=Path.GetFullPath(e.Args[1]);new MainWindow(new DemoPort(),root,true).Show();return;}

@@ -177,5 +177,20 @@
   "作者提供的官方下载免费。第三方收费不代表作者参与、背书或提供服务；第三方修改版可能与作者发布版不同。请通过下方仓库和发布页核对来源。": "Official downloads are free. Third-party fees do not imply the author's involvement, endorsement or support. Modified builds may differ from the author's release. Check the source at the repository below.",
   "MIT 许可证保持不变。本说明不增加许可限制，也不承诺免责效果。": "The MIT License remains unchanged. This notice adds no license restrictions and does not promise immunity from liability.",
   "源码与官方下载（可选择复制）": "Official source and downloads (select to copy)",
-  "关闭": "Close"
+  "关闭": "Close",
+  "Windows 通知": "Windows notification",
+  "Windows 通知未能发送，请检查系统通知设置。": "Could not send the Windows notification. Check system notification settings.",
+  "声音": "Sound",
+  "已停止刷新。A {0} / B {1}，本次刷新 {2} 次。请在游戏内确认保留结果。": "Rerolling stopped. A {0} / B {1}, after {2} rerolls. Confirm the result in the game.",
+  "弹窗": "Popup",
+  "抽卡目标已达成": "Gacha target reached",
+  "提醒设置暂时无法读取，原文件未改动。": "Notification settings could not be read. The original file is unchanged.",
+  "无法播放系统提示音，请检查系统声音设置。": "Could not play the alert. Check Windows sound settings.",
+  "查看结果": "View results",
+  "测试提醒": "Test alerts",
+  "目标达成提醒": "When target is reached",
+  "系统通知可能受 Windows 免打扰设置影响。": "Windows Do not disturb may suppress system notifications.",
+  "这是一条测试提醒，不会开始抽卡或改变当前任务。": "This is a test alert. It does not start draws or change your current run.",
+  "部分提醒未能发送：": "Some alerts could not be sent: ",
+  "组件交接尚未完成，请等待当前操作结算后重新连接，游戏可以保持运行。": "Component handoff is pending. Wait for the current action to finish, then reconnect. You can keep the game running."
 }

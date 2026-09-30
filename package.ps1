@@ -29,6 +29,7 @@ foreach($flavor in @('Portable','Lite')){
     RunCheck @('--identity',('"'+$identityPath+'"'))
     $identity=Get-Content $identityPath -Raw | ConvertFrom-Json
     if($identity.runtime -ne 'BD2InfiniteGacha.Runtime5' -or $identity.version -ne $Version){throw 'Embedded identity differs from release'}
+    RunCheck @('--startup-smoke',('"'+(Join-Path $check 'disconnected-startup')+'"'))
     RunCheck @('--smoke',('"'+$check+'"'))
     $ui=Get-Content (Join-Path $check 'smoke.json') -Raw | ConvertFrom-Json
     if($ui.status -ne 'passed'){throw 'Packaged UI regression failed'}

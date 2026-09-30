@@ -9,6 +9,7 @@ namespace BD2InfiniteGacha
 {
     public static class Identity
     {
+        public const string LiveEntries="runtime.json|control.json|snapshot.json";
         public const string Version="0.2.3",Runtime="BD2InfiniteGacha.Runtime5";
         public static string Root {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"BD2InfiniteGacha");}}
         public static string Hash(string value){using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value))).Replace("-","").ToLowerInvariant();}

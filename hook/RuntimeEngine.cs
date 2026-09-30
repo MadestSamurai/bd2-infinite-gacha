@@ -14,6 +14,7 @@ namespace BD2InfiniteGacha.Runtime
 {
     internal sealed class RuntimeEngine
     {
+        private bool networkInFlight;
         private static RuntimeEngine active;private Harmony harmony;private Timer heartbeat;
         private readonly Dictionary<string,MemberInfo> members=new Dictionary<string,MemberInfo>();
         private readonly AutomationMachine machine=new AutomationMachine();
@@ -57,7 +58,7 @@ namespace BD2InfiniteGacha.Runtime
         }
         private void Patch(string role,string name){harmony.Patch((MethodInfo)Member(role),postfix:new HarmonyMethod(typeof(RuntimeEngine).GetMethod(name,BindingFlags.NonPublic|BindingFlags.Static)));}
         private static void AfterFrame(){if(active!=null)active.Tick();}
-        private static void AfterResponse(bool __result,int __2){var a=active;if(a!=null){a.responseError=__result&&__2==0?0:__2==0?-1:__2;Interlocked.Increment(ref a.response);}}
+        private static void AfterResponse(bool __result,int __2){var a=active;if(a!=null){a.networkInFlight=false;a.responseError=__result&&__2==0?0:__2==0?-1:__2;Interlocked.Increment(ref a.response);}}
         private static void AfterResult(){var a=active;if(a!=null)Interlocked.Increment(ref a.result);}
         private void RefreshCatalog(string identity)
         {
@@ -114,8 +115,9 @@ namespace BD2InfiniteGacha.Runtime
             if(group==null||group.GachaSubType!=(int)Define_GachaSubType.GstResemara||group.TenTimeGachaId!=pool.DrawId)throw new InvalidOperationException("卡池发生变化，已停止");
             var source=((MethodInfo)Member("Preview")).GetParameters()[0].ParameterType;
             var capturedUi=ui;((FieldInfo)Member("BusyPreview")).SetValue(capturedUi,true);
+            networkInFlight=true;
             try{Call("Preview",Enum.Parse(source,"SourceFromSpecialGacha"),product.GroupId,product.Id,product.SaleGroup,pool.DrawId,(Action)(()=>{if(capturedUi!=null)((FieldInfo)Member("BusyPreview")).SetValue(capturedUi,false);}));}
-            catch{if(capturedUi!=null)((FieldInfo)Member("BusyPreview")).SetValue(capturedUi,false);throw;}
+            catch{networkInFlight=false;if(capturedUi!=null)((FieldInfo)Member("BusyPreview")).SetValue(capturedUi,false);throw;}
         }
         private void Tick()
         {
@@ -141,6 +143,8 @@ namespace BD2InfiniteGacha.Runtime
             if(!changed&&snapshot.At-publishedAt<TimeSpan.FromMilliseconds(500).Ticks)return;publishedAt=snapshot.At;publishedKey=snapshot.ResultKey;publishedSkips=snapshot.SkipCount;
             if(!publication.Publish(snapshot,s=>Storage.Write("snapshot.json",s)))Storage.Event("publication_retry",publication.Error);
         }
+        internal void PrepareHandoff(){lastControl=new Control();machine.Halt("stopped","component-handoff");}
+        internal string HandoffBusy()=>networkInFlight?"gacha request awaiting reply":"";
         internal void Stop(){active=null;machine.Halt("stopped","组件已停止");heartbeat?.Dispose();heartbeat=null;if(harmony!=null){foreach(string role in new[]{"Frame","Response","SetResult"})harmony.Unpatch((MethodInfo)Member(role),HarmonyPatchType.All,harmony.Id);harmony=null;}}
     }
 }

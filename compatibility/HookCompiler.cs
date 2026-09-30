@@ -54,9 +54,10 @@ public static class HookCompiler
         var declarations=contract.Apis.Select(a=>{var m=BindingResolver.Api(resolved,a);return "internal const string "+a.Role+"Type="+JsonSerializer.Serialize(m.DeclaringType.FullName)+", "+a.Role+"Name="+JsonSerializer.Serialize(m.Name)+";";});
         var sources=typeof(HookCompiler).Assembly.GetManifestResourceNames().Where(n=>n.StartsWith("Hook.")).Select(n=>CSharpSyntaxTree.ParseText(Encoding.UTF8.GetString(Resource(n)),path:n)).ToList();
         sources.Add(CSharpSyntaxTree.ParseText("namespace BD2InfiniteGacha.Runtime { internal static class Names {"+string.Join("\n",declarations)+"} }"));
+        sources.Add(CSharpSyntaxTree.ParseText("namespace BD2.LocalIpc { public static class Build { public const string Fingerprint = " + JsonSerializer.Serialize(Fingerprint) + "; } }"));
         var refs=new List<MetadataReference>();foreach(var file in Directory.EnumerateFiles(managed,"*.dll"))try{refs.Add(MetadataReference.CreateFromFile(file));}catch(BadImageFormatException){}
         refs.Add(MetadataReference.CreateFromImage(Resource("BD2InfiniteGacha.Harmony.dll")));
-        var c=CSharpCompilation.Create(assemblyName,sources,refs,new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,platform:Platform.X64,deterministic:true));
+        var c=CSharpCompilation.Create(assemblyName+".Hot."+Fingerprint.Substring(0,12),sources,refs,new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,platform:Platform.X64,deterministic:true));
         using var b=new MemoryStream();var result=c.Emit(b,manifestResources:[new ResourceDescription("BD2InfiniteGacha.Harmony.dll",()=>new MemoryStream(Resource("BD2InfiniteGacha.Harmony.dll")),true)]);
         if(!result.Success)throw new InvalidOperationException(string.Join("\n",result.Diagnostics.Where(d=>d.Severity==DiagnosticSeverity.Error).Take(20)));
         return new(b.ToArray(),resolved.Report);
