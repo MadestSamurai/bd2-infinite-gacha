@@ -12,6 +12,8 @@ using System.Windows.Threading;
 namespace BD2InfiniteGacha.Desktop;
 public partial class MainWindow:Window
 {
+ public bool HostedAutomationEnabled => controller.Running || connecting;
+
     private readonly WindowLanguage language;
     private readonly IClientPort port;private readonly ClientController controller;private readonly Preferences preferences;private readonly string root;private readonly bool smoke;
     private readonly ObservableCollection<CostumeRow> costumes=new();private readonly ObservableCollection<RuleRowModel> conditions=new();
@@ -37,7 +39,7 @@ public partial class MainWindow:Window
     private void Language_Changed(object sender,SelectionChangedEventArgs e)
     {
         if(language==null||controller==null)return;
-        string selected=LanguageChoice.SelectedIndex==0?"zh-CN":"en-US";
+        string selected=AppDomain.CurrentDomain.GetData("BD2Daily.HostedLanguage") as string ?? (LanguageChoice.SelectedIndex==0?"zh-CN":"en-US");
         try{LanguagePreference.Save(root,selected);language.Select(selected);if(snapshot!=null)RefreshPoolList(snapshot);RebuildCostumes();updating=true;foreach(var rule in conditions)rule.Refresh();updating=false;ShowResult();Validate();}
         catch(Exception ex){Error(ex);}
     }

@@ -31,6 +31,20 @@ Test("pool end dates sort newest first with stable fallbacks and explicit timezo
  Check(copy.EndTimeUnixMilliseconds==end,"runtime serializer preserves milliseconds");
  Check(PoolChoice.Create([],0,new("en-US"),zone).Length==0,"empty catalog");
 });
+Test("server resynchronization evaluates result without inventing a completed draw",()=>{
+ var s=Snap();var c=Command(s.At);var m=new AutomationMachine();m.Step(c,s,0,0,0,s.At);
+ s.NetworkPending=true;
+ long now=s.At+TimeSpan.FromMinutes(10).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;
+ Check(!m.Step(c,s,0,0,0,now)&&m.State=="pending","long outage neither redraws nor faults");
+ s.NetworkPending=false;s.ResultReconciled=true;s.ResultReady=true;s.Result=Cards(3,0);
+ Check(!m.Step(c,s,0,0,0,now+1000)&&m.State=="matched"&&m.Rolls==0,"fresh matching server result stops, unknown draw not counted");
+ s=Snap();c=Command(s.At);m=new();m.Step(c,s,0,0,0,s.At);s.ResultReconciled=true;
+ now=s.At+TimeSpan.FromSeconds(31).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;
+ Check(m.Step(c,s,0,0,0,now)&&m.State=="pending"&&m.Rolls==0,"fresh nonmatching server result permits one new draw");
+ s.ResultReconciled=false;s.NetworkPending=true;
+ Check(!m.Step(c,s,0,0,0,now+1000),"new in-flight draw is not repeated");
+ c.Enabled=false;Check(!m.Step(c,s,0,0,0,now+2000)&&m.State=="stopped","stop still works during reconciliation");
+});
 Test("default requires explicit threshold",()=>{var d=new RuleDraft();Check(Rules.Validate(d,Stock(1,2))!="","blank must block");Check(d.CountCopies&&d.Rows.All(r=>!r.Enabled)&&d.Interval=="1000","defaults");});
 Test("copy and distinct semantics",()=>{var d=Draft();Check(Rules.Evaluate(d,Cards(3,2),Pool().Costumes).Matched,"copies");d.CountCopies=false;var result=Rules.Evaluate(d,Cards(3,2),Pool().Costumes);Check(!result.Matched&&result.A==1&&result.B==1,"distinct");d.Rows[1].Enabled=true;d.Rows[1].B="1";Check(Rules.Evaluate(d,Cards(3,2),Pool().Costumes).Matched,"distinct secondary");});
 Test("A priority uses inclusive top and exact lower rows",()=>{var d=Draft();d.Rows[1].Enabled=true;d.Rows[1].B="1";Check(Rules.Evaluate(d,Cards(3,0),Pool().Costumes).Matched,"inclusive");Check(Rules.Evaluate(d,Cards(4,0),Pool().Costumes).Matched,"above");Check(!Rules.Evaluate(d,Cards(2,8),Pool().Costumes).Matched,"not lower threshold");Check(Rules.Evaluate(d,Cards(1,1),Pool().Costumes).Matched,"exact");Check(!Rules.Evaluate(d,Cards(0,10),Pool().Costumes).Matched,"disabled zero");});
@@ -72,7 +86,7 @@ Test("skip is revoked on every stop or failure boundary",()=>{
  }
 });
 Test("response error stops without retries",()=>{var s=Snap();var c=Command(s.At);var m=new AutomationMachine();m.Step(c,s,0,0,0,s.At);Check(!m.Step(c,s,1,0,123,s.At+10000000)&&m.State=="error"&&m.Message.Contains("123"),"error");Check(!m.Step(c,s,2,2,0,s.At+20000000),"no retry");});
-Test("request timeout no retry while lease renews",()=>{var s=Snap();var c=Command(s.At);var m=new AutomationMachine();m.Step(c,s,0,0,0,s.At);long now=s.At+TimeSpan.FromSeconds(31).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;Check(!m.Step(c,s,0,0,0,now)&&m.State=="error","timeout");Check(!m.Step(c,s,1,1,0,now+1000),"late response cannot resume");});
+Test("request timeout no retry while lease renews",()=>{var s=Snap();var c=Command(s.At);var m=new AutomationMachine();m.Step(c,s,0,0,0,s.At);long now=s.At+TimeSpan.FromSeconds(31).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;Check(!m.Step(c,s,0,0,0,now)&&m.State=="pending","timeout stays recoverable without redraw");s.Result=Cards(3,0);Check(!m.Step(c,s,1,1,0,now+1000)&&m.State=="matched","late verified result resumes stop-condition evaluation");});
 Test("lease expiry and explicit stop retain current result",()=>{foreach(bool expired in new[]{true,false}){var s=Snap();var c=Command(s.At);var m=new AutomationMachine();m.Step(c,s,0,0,0,s.At);if(expired)c.Expires=s.At;else c.Enabled=false;Check(!m.Step(c,s,1,1,0,s.At)&&m.State=="stopped","stop");c.Expires=s.At+10000000;c.Enabled=true;Check(!m.Step(c,s,1,1,0,s.At),"same owner no restart");}});
 Test("process account pool lock and invalid rules fail closed",()=>{
  Action<Snapshot,Control>[] mutations=[(s,c)=>s.ProcessId++,(s,c)=>s.ProcessStart++,(s,c)=>s.Account="changed",(s,c)=>s.PoolId++,(s,c)=>s.Pools[0].Key="new",(s,c)=>s.Locked=true,(s,c)=>c.Rules.Threshold="11"];
@@ -138,7 +152,7 @@ Test("long run survives missing polls and transient writes without extra request
 Test("persistent missing UI and unrecovered result animation stop with reasons",()=>{
  var s=Snap();var c=Command(s.At);var m=new AutomationMachine();m.Step(c,s,0,0,0,s.At);s.PoolId=0;m.Step(c,s,0,0,0,s.At+1000000);
  long now=s.At+TimeSpan.FromSeconds(16).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;
- Check(!m.Step(c,s,0,0,0,now)&&m.State=="error"&&m.Message.Contains("15"),"UI missing deadline");
+ Check(!m.Step(c,s,0,0,0,now)&&m.State=="pending"&&m.Message.Contains("等待"),"UI loss remains a recoverable wait");
  s=Snap();c=Command(s.At);m=new();m.Step(c,s,0,0,0,s.At);s.ResultReady=false;m.Step(c,s,1,0,0,s.At+1000000);
  now=s.At+TimeSpan.FromSeconds(121).Ticks;c.Expires=now+TimeSpan.FromSeconds(10).Ticks;
  Check(!m.Step(c,s,1,0,0,now)&&m.State=="error"&&m.Message.Contains("120"),"animation deadline separate from server timeout");

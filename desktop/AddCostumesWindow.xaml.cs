@@ -13,6 +13,7 @@ public partial class AddCostumesWindow:Window
         view=new ListCollectionView(source.ToArray()){Filter=Matches};Choices.ItemsSource=view;Refresh();
         Loaded+=(_,_)=>Query.Focus();
     }
+    public void ApplyHostedLanguage(string code){language.Select(code);Selection();}
     private bool Matches(object value)
     {
         var row=(CostumeRow)value;string q=Query.Text.Trim();
@@ -34,3 +35,4 @@ public partial class AddCostumesWindow:Window
         if(!AddB.IsEnabled||!AddA.IsEnabled)throw new Exception("Picker selection not enabled");Accept(group);
     }
 }
+

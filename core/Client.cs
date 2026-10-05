@@ -35,7 +35,7 @@ public sealed class GamePort:IClientPort
     {public int ProcessId{get;set;}public long Start{get;set;}public string Fingerprint{get;set;}="";public long Address{get;set;}public string Error{get;set;}="";}
     public async Task ConnectAsync(Action<string> progress,CancellationToken cancellation)
     {
-        var game=Find()??throw new InvalidOperationException("请先启动并登录游戏。");var path=Path.Combine(root,"connection.json");var pipe=BD2.LocalIpc.DesktopFiles.Connect(root,game.Id,game.Start);
+        var game=Find()??throw new InvalidOperationException("请先启动并登录游戏。");var path=Path.Combine(root,"connection.json");var pipe=BD2.LocalIpc.DesktopFiles.Connect(root,game.Id,game.Start);if(BD2.LocalIpc.HostedConnection.TryOpen(pipe,game.Id,game.Start))return;
         try{if(pipe.Fingerprint()==HookCompiler.Fingerprint){var status=JsonFiles.Read<RuntimeStatus>(Path.Combine(root,"runtime.json"));if(status?.State=="active"&&status.At>DateTime.UtcNow.AddSeconds(-5).Ticks){pipe.Open(HookCompiler.Fingerprint);progress("已连接组件，等待游戏状态");return;}}}
         catch(BD2.LocalIpc.LeaseRevokedException){}catch(TimeoutException){}catch(IOException){}
         progress("解析本机客户端接口并准备组件…");
